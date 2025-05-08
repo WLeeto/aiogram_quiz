@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from app.dialog_app.dialog_main import QuizQueryHandler
+from app.dialog_app.dialog_main import QuizHandler
 
 router = Router()
 
@@ -22,7 +22,7 @@ class TestAddQuestStates(StatesGroup):
 Попытка создать автоматический диалог
 """
 
-new_quiz = QuizQueryHandler()
+new_quiz = QuizHandler()
 new_quiz.add_step(text="Первый шаг c клавиатурой", data_key="step_1", keyboard=InlineKeyboardMarkup(
     inline_keyboard=[
         [
