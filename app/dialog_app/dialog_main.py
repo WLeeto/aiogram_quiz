@@ -5,13 +5,9 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 class QuizBase:
-    def __init__(self, bot: Bot, auto_delete: bool = False):
-        self.bot = bot
-
+    def __init__(self):
         self.steps = []
         self._step_data = {}
-
-        self.auto_delete = auto_delete
 
     def add_step(self, text: str, data_key: str, keyboard: Optional[InlineKeyboardMarkup] = None):
         self.steps.append({
