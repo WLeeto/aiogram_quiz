@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from aiogram import Router, types, F
@@ -17,10 +16,6 @@ logger = logging.getLogger(__name__)
 class TestAddQuestStates(StatesGroup):
     start = State()
 
-
-"""
-Попытка создать автоматический диалог
-"""
 
 new_quiz = QuizHandler()
 new_quiz.add_step(text="Первый шаг c клавиатурой", data_key="step_1", keyboard=InlineKeyboardMarkup(
