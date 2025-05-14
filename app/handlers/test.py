@@ -56,4 +56,5 @@ async def start_test_q(message: types.Message, state: FSMContext):
 
 @router.callback_query(TestAddQuestStates.start)
 async def process_query_answer(callback_query: types.CallbackQuery, state: FSMContext):
+    # TODO: обработать полученные данные в случае окончания квиза
     await new_quiz.process_callback(callback_query, state)

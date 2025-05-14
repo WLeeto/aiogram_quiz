@@ -164,6 +164,7 @@ class QuizHandler(QuizBase):
             state (FSMContext): The FSM context for storing quiz state.
             state_data (dict): The collected state data from the quiz.
         """
+        # TODO: вывести собранные данные
         if callback_query.data == "approve":
             await callback_query.message.answer(f"Собранные данные: {state_data}")
         else:
