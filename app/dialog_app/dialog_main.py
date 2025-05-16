@@ -143,9 +143,10 @@ class QuizHandler(QuizBase):
         """
         state_data = await state.get_data()
         step_index = state_data.get("step", 1)
+        await callback_query.message.delete_reply_markup()
         if callback_query.data in ("approve", "cancel"):
-            await self.process_quiz_end(callback_query, state, state_data)
-            return
+            collected_data = await self.process_quiz_end(callback_query, state, state_data)
+            return collected_data
         if step_index > 0:
             prev_step = self.get_step(step_index - 1)
             await state.update_data(**{prev_step["data_key"]: callback_query.data})
@@ -153,7 +154,11 @@ class QuizHandler(QuizBase):
             await self._send_step(callback_query.message, step_index)
             await state.update_data(step=step_index + 1)
 
-    async def process_quiz_end(self, callback_query: types.CallbackQuery, state: FSMContext, state_data: dict):
+    async def process_quiz_end(
+            self, callback_query: types.CallbackQuery,
+            state: FSMContext,
+            state_data: dict
+    ):
         """
         Handle the end of the quiz, processing approval or cancellation.
         
@@ -164,9 +169,10 @@ class QuizHandler(QuizBase):
             state (FSMContext): The FSM context for storing quiz state.
             state_data (dict): The collected state data from the quiz.
         """
-        # TODO: вывести собранные данные
         if callback_query.data == "approve":
-            await callback_query.message.answer(f"Собранные данные: {state_data}")
+            # await callback_query.message.answer(f"Собранные данные: {state_data}")
+            await callback_query.message.answer("Добавление завершено")
         else:
-            await callback_query.message.answer("Добавление квеста отменено")
+            await callback_query.message.answer("Добавление отменено")
         await state.clear()
+        return state_data

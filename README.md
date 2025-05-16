@@ -64,10 +64,9 @@ async def start_test_q(message: types.Message, state: FSMContext):
 
 @router.callback_query(TestAddQuestStates.start)
 async def process_query_answer(callback_query: types.CallbackQuery, state: FSMContext):
-    await new_quiz.process_callback(callback_query, state)
+    collected_data = await new_quiz.process_callback(callback_query, state)
+    print(collected_data)
 ```
 
 ## Доработки
 - Поддержка удаления старых сообщений
-- Поддержка вывода результатов в return state
-- 
