@@ -17,7 +17,7 @@ class TestAddQuestStates(StatesGroup):
     start = State()
 
 
-new_quiz = QuizHandler()
+new_quiz = QuizHandler(delete_used_messages=False)
 new_quiz.add_step(text="Первый шаг c клавиатурой", data_key="step_1", keyboard=InlineKeyboardMarkup(
     inline_keyboard=[
         [
@@ -51,10 +51,12 @@ async def test_command(message: types.Message, state: FSMContext):
 
 @router.message(TestAddQuestStates.start)
 async def start_test_q(message: types.Message, state: FSMContext):
-    await new_quiz.process_message(message, state)
+    await new_quiz.process_step(message, state)
 
 
 @router.callback_query(TestAddQuestStates.start)
 async def process_query_answer(callback_query: types.CallbackQuery, state: FSMContext):
-    collected_data = await new_quiz.process_callback(callback_query, state)
-    print(collected_data)
+    collected_data = await new_quiz.process_step(callback_query, state)
+    if collected_data:
+        # окончание квиза
+        print(collected_data)

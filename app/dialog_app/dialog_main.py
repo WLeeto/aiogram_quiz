@@ -1,7 +1,8 @@
 from typing import Optional, Dict, Any
-from aiogram import types, Bot
+from aiogram import types, Bot, exceptions
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from bot import bot
 
 
 class QuizBase:
@@ -70,7 +71,10 @@ class QuizBase:
         """
         await self._send_step(message, 0)
 
-    async def _send_step(self, message_or_callback, step_index: int):
+    async def _send_step(
+            self,
+            message_or_callback: types.Message | types.CallbackQuery,
+            step_index: int):
         """
         Send a specific step to the user.
         
@@ -82,9 +86,10 @@ class QuizBase:
         """
         step = self.steps[step_index]
         if step["keyboard"]:
-            await message_or_callback.answer(step["text"], reply_markup=step["keyboard"])
+            bot_message = await message_or_callback.answer(step["text"], reply_markup=step["keyboard"])
         else:
-            await message_or_callback.answer(step["text"])
+            bot_message = await message_or_callback.answer(step["text"])
+        return bot_message
 
     def get_step(self, step_index: int) -> Dict[str, Any]:
         """
@@ -111,7 +116,92 @@ class QuizBase:
         """
         return len(self.steps)
 
+    async def delete_prev_messages(
+            self, instance: types.Message | types.CallbackQuery,
+            trash_messages_ids: list,
+            delete_messages: bool
+    ):
+        """
+        Delete previous messages from the user.
+
+        Удалить предыдущие сообщения от пользователя.
+
+        Args:
+            instance (types.Message | types.CallbackQuery): The incoming message or callback query.
+            trash_messages_ids (list): The list of message IDs to delete.
+            delete_messages (bool): Whether to delete messages or not.
+        """
+        if not delete_messages:
+            return
+
+        if isinstance(instance, types.Message):
+            message = instance
+        elif isinstance(instance, types.CallbackQuery):
+            message = instance.message
+        else:
+            raise ValueError("instance must be types.Message or types.CallbackQuery")
+
+        if trash_messages_ids:
+            await bot.delete_messages(
+                chat_id=message.chat.id,
+                message_ids=trash_messages_ids)
+
 class QuizHandler(QuizBase):
+    def __init__(self, delete_used_messages: bool = True):
+        super().__init__()
+        self.delete_used_messages = delete_used_messages
+
+    async def process_step(
+            self,
+            instance: types.Message | types.CallbackQuery,
+            state: FSMContext,
+    ):
+        """
+        Process a step from the user during the quiz flow.
+
+        Обработать шаг от пользователя во время прохождения опроса.
+
+        Args:
+            instance (types.Message | types.CallbackQuery): The incoming message or callback query.
+            state (FSMContext): The FSM context for storing quiz state.
+        :return: The collected state data from the quiz.
+        """
+
+        state_data = await state.get_data()
+
+        trash_messages_ids = (
+            [] if state_data.get("trash_messages_ids") is None
+            else state_data.get("trash_messages_ids")
+        )
+
+        if isinstance(instance, types.Message):
+            bot_answer = await self.process_message(instance, state)
+            await self.delete_prev_messages(
+                bot_answer,
+                trash_messages_ids,
+                self.delete_used_messages,
+            )
+            trash_messages_ids.append(bot_answer.message_id)
+
+        elif isinstance(instance, types.CallbackQuery):
+            if self.delete_used_messages:
+                await instance.message.delete()
+            bot_answer = await self.process_callback(instance, state)
+            if isinstance(bot_answer, dict):
+                return bot_answer
+
+            await self.delete_prev_messages(
+                bot_answer,
+                trash_messages_ids,
+                self.delete_used_messages
+            )
+            trash_messages_ids.append(bot_answer.message_id)
+
+        else:
+            raise TypeError(f"Unsupported instance type: {type(instance)}")
+
+        await state.update_data(trash_messages_ids=trash_messages_ids)
+
     async def process_message(self, message: types.Message, state: FSMContext):
         """
         Process a message from the user during the quiz flow.
@@ -123,13 +213,15 @@ class QuizHandler(QuizBase):
             state (FSMContext): The FSM context for storing quiz state.
         """
         state_data = await state.get_data()
+
         step_index = state_data.get("step", 1)
         if step_index > 0:
             prev_step = self.get_step(step_index - 1)
             await state.update_data(**{prev_step["data_key"]: message.text})
         if step_index < self.total_steps():
-            await self._send_step(message, step_index)
+            bot_answer = await self._send_step(message, step_index)
             await state.update_data(step=step_index + 1)
+            return bot_answer
 
     async def process_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """
@@ -143,7 +235,10 @@ class QuizHandler(QuizBase):
         """
         state_data = await state.get_data()
         step_index = state_data.get("step", 1)
-        await callback_query.message.delete_reply_markup()
+        try:
+            await callback_query.message.delete_reply_markup()
+        except exceptions.TelegramBadRequest:
+            pass
         if callback_query.data in ("approve", "cancel"):
             collected_data = await self.process_quiz_end(callback_query, state, state_data)
             return collected_data
@@ -151,8 +246,9 @@ class QuizHandler(QuizBase):
             prev_step = self.get_step(step_index - 1)
             await state.update_data(**{prev_step["data_key"]: callback_query.data})
         if step_index < self.total_steps():
-            await self._send_step(callback_query.message, step_index)
+            bot_answer = await self._send_step(callback_query.message, step_index)
             await state.update_data(step=step_index + 1)
+            return bot_answer
 
     async def process_quiz_end(
             self, callback_query: types.CallbackQuery,
@@ -170,7 +266,6 @@ class QuizHandler(QuizBase):
             state_data (dict): The collected state data from the quiz.
         """
         if callback_query.data == "approve":
-            # await callback_query.message.answer(f"Собранные данные: {state_data}")
             await callback_query.message.answer("Добавление завершено")
         else:
             await callback_query.message.answer("Добавление отменено")
